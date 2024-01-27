@@ -3,6 +3,7 @@
 #include <array>              // std::array<>
 #include <cmath>              // fmin(), fmax(), pow()
 #include <chrono>
+#include <functional>         // for function pointer.
 
 constexpr size_t dimensions = 3;    // 3-dimensions (x, y, and z)
 
@@ -33,15 +34,17 @@ static double Error(std::array<double, dimensions>& yk_1, std::array<double, dim
     return err;
 }
 
-static void Integrate(double t0, double h, int T, std::array<double, dimensions> &y0, double abs_tol, double rel_tol)
+static void Integrate(double t0, double h, int T, double abs_tol, 
+    double rel_tol, std::array<double, dimensions> &y0, 
+    std::function<std::array<double, dimensions>(double, std::array<double, dimensions> &)> Func)
 {
-    /* Dormand-Prince butcher tableau*/
-    double a0 = 1.0 / 5.0,  a1 = 1.0 / 5.0;
-    double b0 = 3.0 / 10.0, b1 = 3.0 / 40.0,       b2 =  9.0 / 40.0;
-    double c0 = 4.0 / 5.0,  c1 = 44.0 / 45.0,      c2 = -56.0 / 15.0,      c3 = 32.0 / 9.0;
-    double d0 = 8.0 / 9.0,  d1 = 19372.0 / 6561.0, d2 = -25360.0 / 2187.0, d3 = 64448.0 / 6561.0, d4 = -212.0 / 729.0;
-    double e0 = 1.0,        e1 = 9017.0 / 3168.0,  e2 = -355.0 / 33.0,     e3 = 46732.0 / 5247.0, e4 = 49.0 / 176.0,  e5 = -5103.0 / 18656.0;
-    double f0 = 1.0,        f1 = 35.0 / 384.0,     f3 = 500.0 / 1113.0,    f4 = 125.0 / 192.0, f5 = -2187.0 / 6784.0, f6 = 11.0 / 84.0;
+    /* Dorman-Prince 4(5) butcher tableau*/
+    const double a0 = 1.0 / 5.0,  a1 = 1.0 / 5.0;
+    const double b0 = 3.0 / 10.0, b1 = 3.0 / 40.0,       b2 =  9.0 / 40.0;
+    const double c0 = 4.0 / 5.0,  c1 = 44.0 / 45.0,      c2 = -56.0 / 15.0,      c3 = 32.0 / 9.0;
+    const double d0 = 8.0 / 9.0,  d1 = 19372.0 / 6561.0, d2 = -25360.0 / 2187.0, d3 = 64448.0 / 6561.0, d4 = -212.0 / 729.0;
+    const double e0 = 1.0,        e1 = 9017.0 / 3168.0,  e2 = -355.0 / 33.0,     e3 = 46732.0 / 5247.0, e4 = 49.0 / 176.0,  e5 = -5103.0 / 18656.0;
+    const double f0 = 1.0,        f1 = 35.0 / 384.0,     f3 = 500.0 / 1113.0,    f4 = 125.0 / 192.0, f5 = -2187.0 / 6784.0, f6 = 11.0 / 84.0;
     double g1 = 5179.0 / 57600.0, g3 = 7571.0 / 16695.0, g4 = 393.0 / 640.0, g5 = -92097.0 / 339200.0, g6 = 187.0 / 2100.0, g7 = 1.0 / 40.0;
     
 
@@ -70,43 +73,43 @@ static void Integrate(double t0, double h, int T, std::array<double, dimensions>
             for (size_t i = 0; i < dimensions; i++) {
                 k[i] = yk[i];
             }
-            std::array<double, dimensions> n1 = Lorentz(dt, k);
+            std::array<double, dimensions> n1 = Func(dt, k);
 
             // ------------------------------Second-stage----------------------
             for (size_t i = 0; i < dimensions; i++) {
                 k[i] = yk[i] + h * (a1 * n1[i]);
             }
-            std::array<double, dimensions> n2 = Lorentz(dt, k);
+            std::array<double, dimensions> n2 = Func(dt, k);
 
             // ------------------------------Third-stage-----------------------
             for (size_t i = 0; i < dimensions; i++) {
                 k[i] = yk[i] + h * (b1 * n1[i] + b2 * n2[i]);
             }
-            std::array<double, dimensions> n3 = Lorentz(dt, k);
+            std::array<double, dimensions> n3 = Func(dt, k);
 
             // ------------------------------Fourth-stage----------------------
             for (size_t i = 0; i < dimensions; i++) {
                 k[i] = yk[i] + h * (c1 * n1[i] + c2 * n2[i] + c3 * n3[i]);
             }
-            std::array<double, dimensions> n4 = Lorentz(dt, k);
+            std::array<double, dimensions> n4 = Func(dt, k);
 
             // ------------------------------Fifth-stage-----------------------
             for (size_t i = 0; i < dimensions; i++) {
                 k[i] = yk[i] + h * (d1 * n1[i] + d2 * n2[i] + d3 * n3[i] + d4 * n4[i]);
             }
-            std::array<double, dimensions> n5 = Lorentz(dt, k);
+            std::array<double, dimensions> n5 = Func(dt, k);
 
             // ------------------------------Sixth-stage--------------------------
             for (size_t i = 0; i < dimensions; i++) {
                 k[i] = yk[i] + h * (e1 * n1[i] + e2 * n2[i] + e3 * n3[i] + e4 * n4[i] + e5 * n5[i]);
             }
-            std::array<double, dimensions> n6 = Lorentz(dt, k);
+            std::array<double, dimensions> n6 = Func(dt, k);
 
             // ------------------------------Seventh-stage-----------------------
             for (size_t i = 0; i < dimensions; i++) {
                 k[i] = yk[i] + h * (f1 * n1[i] + f3 * n3[i] + f4 * n4[i] + f5 * n5[i] + f6 * n6[i]);
             }
-            std::array<double, dimensions> n7 = Lorentz(dt, k);
+            std::array<double, dimensions> n7 = Func(dt, k);
 
             // ------------------------------------------------------------------------------
             std::array<double, dimensions> yk_1{};           /* Gives the fifth-order accurate solution */
@@ -151,6 +154,6 @@ int main(void)
     std::array<double, dimensions> y0 = { -8.0, 8.0, 27.0 };
     double t0 = 0.0, h0 = 1e-3, abs_tol = 1e-6, rel_tol = 1e-3;
     int T = 20000;
-    Integrate(t0, h0, T, y0, abs_tol, rel_tol);
+    Integrate(t0, h0, T, abs_tol, rel_tol, y0, Lorentz);
 	return 0;
 }

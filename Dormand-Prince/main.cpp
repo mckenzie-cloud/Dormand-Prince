@@ -7,6 +7,15 @@
 
 constexpr size_t dimensions = 3;    // 3-dimensions (x, y, and z)
 
+/* Dorman-Prince 4(5) butcher tableau*/
+const double a0 = 1.0 / 5.0, a1 = 1.0 / 5.0;
+const double b0 = 3.0 / 10.0, b1 = 3.0 / 40.0, b2 = 9.0 / 40.0;
+const double c0 = 4.0 / 5.0, c1 = 44.0 / 45.0, c2 = -56.0 / 15.0, c3 = 32.0 / 9.0;
+const double d0 = 8.0 / 9.0, d1 = 19372.0 / 6561.0, d2 = -25360.0 / 2187.0, d3 = 64448.0 / 6561.0, d4 = -212.0 / 729.0;
+const double e0 = 1.0, e1 = 9017.0 / 3168.0, e2 = -355.0 / 33.0, e3 = 46732.0 / 5247.0, e4 = 49.0 / 176.0, e5 = -5103.0 / 18656.0;
+const double f0 = 1.0, f1 = 35.0 / 384.0, f3 = 500.0 / 1113.0, f4 = 125.0 / 192.0, f5 = -2187.0 / 6784.0, f6 = 11.0 / 84.0;
+const double g1 = 5179.0 / 57600.0, g3 = 7571.0 / 16695.0, g4 = 393.0 / 640.0, g5 = -92097.0 / 339200.0, g6 = 187.0 / 2100.0, g7 = 1.0 / 40.0;
+
 static std::array<double, dimensions> Lorentz(double t, std::array<double, dimensions> &x)
 {
 	/* Parameters for Lorentz system. */
@@ -37,16 +46,7 @@ static double Error(std::array<double, dimensions>& yk_1, std::array<double, dim
 static void Integrate(double t0, double h, int T, double abs_tol, 
     double rel_tol, std::array<double, dimensions> &y0, 
     std::function<std::array<double, dimensions>(double, std::array<double, dimensions> &)> Func)
-{
-    /* Dorman-Prince 4(5) butcher tableau*/
-    const double a0 = 1.0 / 5.0,  a1 = 1.0 / 5.0;
-    const double b0 = 3.0 / 10.0, b1 = 3.0 / 40.0,       b2 =  9.0 / 40.0;
-    const double c0 = 4.0 / 5.0,  c1 = 44.0 / 45.0,      c2 = -56.0 / 15.0,      c3 = 32.0 / 9.0;
-    const double d0 = 8.0 / 9.0,  d1 = 19372.0 / 6561.0, d2 = -25360.0 / 2187.0, d3 = 64448.0 / 6561.0, d4 = -212.0 / 729.0;
-    const double e0 = 1.0,        e1 = 9017.0 / 3168.0,  e2 = -355.0 / 33.0,     e3 = 46732.0 / 5247.0, e4 = 49.0 / 176.0,  e5 = -5103.0 / 18656.0;
-    const double f0 = 1.0,        f1 = 35.0 / 384.0,     f3 = 500.0 / 1113.0,    f4 = 125.0 / 192.0, f5 = -2187.0 / 6784.0, f6 = 11.0 / 84.0;
-    double g1 = 5179.0 / 57600.0, g3 = 7571.0 / 16695.0, g4 = 393.0 / 640.0, g5 = -92097.0 / 339200.0, g6 = 187.0 / 2100.0, g7 = 1.0 / 40.0;
-    
+{ 
 
     /* Safety factors */
     double fac = 0.9, fac_min = 0.2, fac_max = 5.0;
@@ -146,6 +146,57 @@ static void Integrate(double t0, double h, int T, double abs_tol,
         }
     }
     std::cout << "Accepted: " << accepted << " Rejected: " << rejected << '\n';
+}
+
+/*
+* In some applications dense output is required and in such a case RK methods must frequently shorten the step-size 
+* and are therefore inefficient. Thus the new RK solvers should have the possibility of producing, if necessary, 
+* reliable approximations to the solution at any point of the integration interval without step-size adjustment 
+* and with little additional computational cost. This has been the main reason 
+* for developing the so-called continuous or interpolatory RK methods. 
+* 
+* This implementation is an example of A continuous formula of order 4.
+* See: Hairer, Norsett, Wanner: Solving Ordinary Differential Equations, Nonstiff Problems. I, pp.191-192
+*/
+void CalculateContinuousExtension(double t, double t_old, double h, std::array<double, dimensions> &derived_old,
+    std::array<double, dimensions> &k3, std::array<double, dimensions> &k4, std::array<double, dimensions> &k5,
+    std::array<double, dimensions> &k6, std::array<double, dimensions> &derived_new, std::array<double, dimensions> &y0,
+    std::array<double, dimensions> &out)
+{
+
+    // k1 = &derive_old;
+    // k3 = &k3;
+    // k4 = &k4;
+    // k5 = &k5;
+    // k6 = &k6;
+    // k7 = &derived_new;
+
+    /* Evaluate interpolating polynomial for y[i] at location x, where t_old <= x <= t_old + h. */
+    double theta = (t - t_old) / h;
+    /* Continuous extension parameters. */
+    const double X1 = 5.0 * (2558722523.0 - 31403016.0 * theta) / 11282082432.0;
+    const double X3 = 100.0 * (882725551.0 - 15701508.0 * theta) / 32700410799.0;
+    const double X4 = 25.0 * (443332067.0 - 31403016.0 * theta) / 1880347072.0;
+    const double X5 = 32805.0 * (23143187.0 - 3489224.0 * theta) / 199316789632.0;
+    const double X6 = 55.0 * (29972135.0 - 7076736.0 * theta) / 822651844.0;
+    const double x7 = 10.0 * (7414447.0 - 829305.0 * theta) / 29380423.0;
+
+    double theta_sqr = theta * theta;
+    double two_theta = 2.0 * theta;
+    double common_term1 = theta_sqr * (3.0 - two_theta);
+    double common_term2 = theta_sqr * (theta_sqr - two_theta + 1.0);
+
+    double b1_theta = common_term1 * f1 + theta * (theta_sqr - two_theta + 1.0) - common_term2 * X1;
+    double b3_theta = common_term1 * f3 + common_term2 * X3;
+    double b4_theta = common_term1 * f4 - common_term2 * X4;
+    double b5_theta = common_term1 * f5 + common_term2 * X5;
+    double b6_theta = common_term1 * f6 - common_term2 * X6;
+    double b7_theta = theta_sqr * (theta - 1.0) + common_term2 * x7;
+
+    for (size_t i = 0; i < dimensions; i++)
+    {
+        out[i] = y0[i] + h * (b1_theta * derived_old[i] + b3_theta * k3[i] + b4_theta * k4[i] + b5_theta * k5[i] + b6_theta * k6[i] + b7_theta * derived_new[i]);
+    }
 }
 
 int main(void)
